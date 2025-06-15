@@ -1,0 +1,16 @@
+---
+- name: Create users
+  include_tasks: users.yml
+  tags: users
+
+- name: Configure firewall
+  include_tasks: firewall.yml
+  tags: fw
+
+- name: Configure SELinux
+  include_tasks: selinux.yml
+  tags: selinux
+
+- name: Configure hosts file
+  include_tasks: hosts.yml
+  tags: hosts

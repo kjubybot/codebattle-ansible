@@ -1,0 +1,19 @@
+---
+- name: Install SELinux tools
+  dnf:
+    name:
+      - policycoreutils-python-utils
+      - selinux-policy-targeted
+    state: present
+
+- name: Ensure SELinux is enabled and enforcing
+  selinux:
+    policy: targeted
+    state: enforcing
+
+- name: Allow SSH to bind to custom port
+  seport:
+    ports: "{{ ssh_port }}"
+    proto: tcp
+    setype: ssh_port_t
+    state: present

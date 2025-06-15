@@ -1,0 +1,38 @@
+---
+- name: Backup original sshd_config
+  copy:
+    src: /etc/ssh/sshd_config
+    dest: /etc/ssh/sshd_config.bak
+    remote_src: yes
+    backup: yes
+  ignore_errors: true
+
+- name: Configure SSH daemon
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    backup: yes
+  loop:
+    - { regexp: "^#?Port ", line: "Port {{ ssh_port }}" }
+    - { regexp: "^#?PermitRootLogin ", line: "PermitRootLogin no" }
+    - { regexp: "^#?PubkeyAuthentication ", line: "PubkeyAuthentication yes" }
+    - {
+        regexp: "^#?PasswordAuthentication ",
+        line: "PasswordAuthentication no",
+      }
+  notify: restart sshd
+
+- name: Restrict SSH access to specific users
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^AllowUsers "
+    line: "AllowUsers deeplaywer {{ ssh_allow_users | join(' ') }}"
+    backup: yes
+  notify: restart sshd
+
+- name: Start and enable SSH service
+  systemd:
+    name: sshd
+    state: started
+    enabled: yes

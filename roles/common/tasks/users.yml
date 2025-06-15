@@ -1,0 +1,36 @@
+---
+- name: Create user groups
+  group:
+    name: wheel
+    state: present
+
+- name: Create users
+  user:
+    name: "{{ item.name }}"
+    groups: "{{ item.groups }}"
+    password: "{{ item.password }}"
+    shell: /bin/bash
+    create_home: yes
+    state: present
+  loop: "{{ users }}"
+
+# - name: Force password change on first login
+#   command: chage -d 0 "{{ item.name }}"
+#   loop: "{{ users }}"
+
+- name: Create .ssh directory for users
+  file:
+    path: "/home/{{ item.name }}/.ssh"
+    state: directory
+    owner: "{{ item.name }}"
+    group: "{{ item.name }}"
+    mode: '0700'
+  loop: "{{ users }}"
+
+- name: Add SSH public keys to authorized_keys
+  authorized_key:
+    user: "{{ item.name }}"
+    key: "{{ item.ssh_key }}"
+    state: present
+  loop: "{{ users }}"
+  when: item.ssh_key is defined

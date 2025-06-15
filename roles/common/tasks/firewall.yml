@@ -1,0 +1,30 @@
+---
+- name: Install firewalld
+  dnf:
+    name: firewalld
+    state: present
+
+- name: Start and enable firewalld
+  systemd:
+    name: firewalld
+    state: started
+    enabled: yes
+
+- name: Configure SSH port in firewall
+  firewalld:
+    port: "{{ ssh_port }}/tcp"
+    permanent: yes
+    state: enabled
+    immediate: yes
+
+- name: Add trusted network sources to trusted zone
+  firewalld:
+    source: "{{ item }}"
+    zone: trusted
+    permanent: yes
+    state: enabled
+    immediate: yes
+  loop: "{{ firewall_trusted_sources }}"
+
+- name: Reload firewalld
+  command: firewall-cmd --reload

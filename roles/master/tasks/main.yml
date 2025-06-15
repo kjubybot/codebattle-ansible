@@ -1,0 +1,20 @@
+---
+- name: Install dependencies
+  include_tasks: dependencies.yml
+  tags: dependencies
+
+- name: Install K3s server
+  include_tasks: k3s.yml
+  tags: k3s
+
+- name: Install and configure PostgreSQL
+  include_tasks: postgresql.yml
+  tags: db
+
+- name: Install Flux
+  include_tasks: flux.yml
+  tags: flux
+
+- name: Install Timoni
+  include_tasks: timoni.yml
+  tags: timoni

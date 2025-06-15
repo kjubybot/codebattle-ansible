@@ -1,0 +1,83 @@
+---
+- name: Install curl and other dependencies
+  dnf:
+    name:
+      - curl
+      - tar
+    state: present
+  tags: timoni
+
+- name: Check if Timoni is already installed
+  stat:
+    path: /usr/local/bin/timoni
+  register: timoni_binary
+  tags: timoni
+
+- name: Get latest Timoni version
+  uri:
+    url: https://api.github.com/repos/stefanprodan/timoni/releases/latest
+    method: GET
+    return_content: yes
+  register: timoni_latest_release
+  when: not timoni_binary.stat.exists
+  tags: timoni
+
+- name: Set Timoni version
+  set_fact:
+    timoni_version: "{{ timoni_latest_release.json.tag_name | regex_replace('^v', '') }}"
+  when: not timoni_binary.stat.exists
+  tags: timoni
+
+- name: Determine architecture
+  set_fact:
+    timoni_arch: "{{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}"
+  when: not timoni_binary.stat.exists
+  tags: timoni
+
+- name: Download Timoni binary
+  get_url:
+    url: "https://github.com/stefanprodan/timoni/releases/download/v{{ timoni_version }}/timoni_{{ timoni_version }}_linux_{{ timoni_arch }}.tar.gz"
+    dest: "/tmp/timoni_{{ timoni_version }}_linux_{{ timoni_arch }}.tar.gz"
+    mode: "0644"
+  when: not timoni_binary.stat.exists
+  tags: timoni
+
+- name: Extract Timoni binary
+  unarchive:
+    src: "/tmp/timoni_{{ timoni_version }}_linux_{{ timoni_arch }}.tar.gz"
+    dest: /tmp
+    remote_src: yes
+  when: not timoni_binary.stat.exists
+  tags: timoni
+
+- name: Install Timoni binary
+  copy:
+    src: /tmp/timoni
+    dest: /usr/local/bin/timoni
+    mode: "0755"
+    owner: root
+    group: root
+    remote_src: yes
+  when: not timoni_binary.stat.exists
+  tags: timoni
+
+- name: Clean up temporary files
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/tmp/timoni_{{ timoni_version }}_linux_{{ timoni_arch }}.tar.gz"
+    - "/tmp/timoni"
+  when: not timoni_binary.stat.exists
+  tags: timoni
+
+- name: Verify Timoni installation
+  command: timoni version
+  register: timoni_version_output
+  changed_when: false
+  tags: timoni
+
+- name: Display Timoni version
+  debug:
+    var: timoni_version_output.stdout
+  tags: timoni

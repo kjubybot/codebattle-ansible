@@ -1,0 +1,9 @@
+---
+- name: Install Python cryptography library and SSL dependencies
+  dnf:
+    name:
+      - python3-cryptography
+      - python3-pyOpenSSL
+      - openssl
+      - openssl-devel
+    state: present

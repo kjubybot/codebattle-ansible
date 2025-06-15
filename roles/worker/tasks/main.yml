@@ -1,0 +1,4 @@
+---
+- name: Install K3s agent
+  include_tasks: k3s-agent.yml
+  tags: k3s

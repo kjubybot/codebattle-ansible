@@ -1,0 +1,48 @@
+---
+- name: Install curl
+  dnf:
+    name: curl
+    state: present
+
+- name: Check if K3s agent is already installed
+  stat:
+    path: /usr/local/bin/k3s
+  register: k3s_binary
+
+- name: Get K3s token from master
+  set_fact:
+    k3s_token: "{{ hostvars[groups['masters'][0]]['k3s_token'] }}"
+  when: hostvars[groups['masters'][0]]['k3s_token'] is defined
+
+- name: Get master hostname
+  set_fact:
+    master_hostname: "{{ groups['masters'][0] }}"
+
+- name: Install K3s agent
+  shell: |
+    curl -sfL https://get.k3s.io | K3S_URL=https://{{ master_hostname }}:6443 K3S_TOKEN={{ k3s_token }} sh -s - agent --node-label=app=runner
+  when: not k3s_binary.stat.exists
+  register: k3s_agent_install
+
+- name: Start and enable K3s agent service
+  systemd:
+    name: k3s-agent
+    state: started
+    enabled: yes
+
+- name: Configure firewall for K3s agent
+  firewalld:
+    port: "{{ item }}"
+    permanent: yes
+    state: enabled
+    immediate: yes
+  loop:
+    - "10250/tcp"
+    - "30000-32767/tcp"
+    - "8472/udp"
+
+- name: Wait for K3s agent to be ready
+  wait_for:
+    path: /var/lib/rancher/k3s/agent/kubelet.kubeconfig
+    timeout: 300
+  when: k3s_agent_install.changed

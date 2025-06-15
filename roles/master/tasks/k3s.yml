@@ -1,0 +1,60 @@
+---
+- name: Install curl
+  dnf:
+    name: curl
+    state: present
+
+- name: Check if K3s is already installed
+  stat:
+    path: /usr/local/bin/k3s
+  register: k3s_binary
+
+- name: Install K3s server
+  shell: |
+    curl -sfL https://get.k3s.io | sh -s - server --disable=traefik --node-label=app=codebattle
+  when: not k3s_binary.stat.exists
+  register: k3s_install
+
+- name: Wait for K3s to be ready
+  wait_for:
+    path: /etc/rancher/k3s/k3s.yaml
+    timeout: 300
+  when: k3s_install.changed
+
+- name: Start and enable K3s service
+  systemd:
+    name: k3s
+    state: started
+    enabled: yes
+
+- name: Generate K3s token
+  shell: k3s token create
+  register: k3s_token_output
+  run_once: true
+  delegate_to: "{{ groups['masters'][0] }}"
+
+- name: Set K3s token fact
+  set_fact:
+    k3s_token: "{{ k3s_token_output.stdout }}"
+  run_once: true
+  delegate_to: "{{ groups['masters'][0] }}"
+
+- name: Store K3s token for workers
+  set_fact:
+    k3s_join_token: "{{ hostvars[groups['masters'][0]]['k3s_token'] }}"
+
+- name: Configure firewall for K3s
+  firewalld:
+    port: "{{ item }}"
+    permanent: yes
+    state: enabled
+    immediate: yes
+  loop:
+    - "6443/tcp"
+    - "10250/tcp"
+    - "8472/udp"
+
+- name: Download kubeconfig
+  fetch:
+    dest: kubeconfig
+    src: /etc/rancher/k3s/k3s.yaml

@@ -1,0 +1,152 @@
+---
+- name: Install PostgreSQL
+  dnf:
+    name:
+      - postgresql-server
+      - postgresql-contrib
+      - python3-psycopg2
+    state: present
+
+- name: Check if PostgreSQL is initialized
+  stat:
+    path: /var/lib/pgsql/data/postgresql.conf
+  register: postgres_initialized
+  tags: db
+
+- name: Initialize PostgreSQL database
+  command: postgresql-setup --initdb
+  when: not postgres_initialized.stat.exists
+  tags: db
+
+- name: Allow PostgreSQL to bind to custom port in SELinux
+  seport:
+    ports: "{{ postgres_port }}"
+    proto: tcp
+    setype: postgresql_port_t
+    state: present
+  tags: db
+
+- name: Start and enable PostgreSQL service
+  systemd:
+    name: postgresql
+    state: started
+    enabled: yes
+  tags: db
+
+- name: Configure PostgreSQL listen address
+  postgresql_set:
+    name: listen_addresses
+    value: "*"
+  become_user: postgres
+  notify: restart postgresql
+  tags: db
+
+- name: Configure PostgreSQL port
+  postgresql_set:
+    name: port
+    value: "7432"
+  become_user: postgres
+  notify: restart postgresql
+  tags: db
+
+- name: Configure PostgreSQL password hashing
+  postgresql_set:
+    name: password_encryption
+    value: scram-sha-256
+  become_user: postgres
+  notify: restart postgresql
+  tags: db
+
+- name: Generate SSL private key for PostgreSQL
+  openssl_privatekey:
+    path: /var/lib/pgsql/data/server.key
+    size: 2048
+    owner: postgres
+    group: postgres
+    mode: "0600"
+  tags: db
+
+- name: Generate SSL certificate signing request
+  openssl_csr:
+    path: /var/lib/pgsql/data/server.csr
+    privatekey_path: /var/lib/pgsql/data/server.key
+    common_name: "{{ inventory_hostname }}"
+    owner: postgres
+    group: postgres
+  tags: db
+
+- name: Generate self-signed SSL certificate
+  openssl_certificate:
+    path: /var/lib/pgsql/data/server.crt
+    privatekey_path: /var/lib/pgsql/data/server.key
+    csr_path: /var/lib/pgsql/data/server.csr
+    provider: selfsigned
+    owner: postgres
+    group: postgres
+    mode: "0644"
+  tags: db
+
+- name: Enable SSL in PostgreSQL
+  postgresql_set:
+    name: ssl
+    value: "on"
+  become_user: postgres
+  notify: restart postgresql
+  tags: db
+
+- name: Configure SSL certificate file
+  postgresql_set:
+    name: ssl_cert_file
+    value: "server.crt"
+  become_user: postgres
+  notify: restart postgresql
+  tags: db
+
+- name: Configure SSL private key file
+  postgresql_set:
+    name: ssl_key_file
+    value: "server.key"
+  become_user: postgres
+  notify: restart postgresql
+  tags: db
+
+- name: Configure pg_hba for password authentication
+  postgresql_pg_hba:
+    address: all
+    contype: host
+    dest: /var/lib/pgsql/data/pg_hba.conf
+    method: scram-sha-256
+    backup: true
+  tags: db
+
+- name: Configure firewall for PostgreSQL
+  firewalld:
+    port: "{{ postgres_port }}/tcp"
+    permanent: yes
+    state: enabled
+    immediate: yes
+  tags: db
+
+- name: Create codebattle database user
+  postgresql_user:
+    name: codebattle
+    password: "{{ codebattle_db_password }}"
+    login_user: postgres
+  become_user: postgres
+  tags: db
+
+- name: Create codebattle database
+  postgresql_db:
+    name: codebattle
+    owner: codebattle
+    login_user: postgres
+  become_user: postgres
+  tags: db
+
+- name: Enable uuid-ossp extension
+  postgresql_ext:
+    name: uuid-ossp
+    login_db: codebattle
+    login_user: postgres
+  become_user: postgres
+  tags: db

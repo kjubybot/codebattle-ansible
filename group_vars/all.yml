@@ -1,0 +1,18 @@
+---
+users:
+  - name: kjubybot
+    groups: wheel
+    password: "{{ 'cbebi123@' | password_hash('sha512') }}"
+    ssh_key: "sk-ecdsa-sha2-nistp256@openssh.com AAAAInNrLWVjZHNhLXNoYTItbmlzdHAyNTZAb3BlbnNzaC5jb20AAAAIbmlzdHAyNTYAAABBBJuhQCikLRqS8b01FJRoW8N8/XfZJa4u5ZOM/gFEZWwhTnXhX2GAF2AfGeEaG/WoAeudD8pz3aiNYYc8naOWi9wAAAAEc3NoOg== ssh:"
+
+# SSH Configuration
+ssh_port: 22
+ssh_allow_users: ["deeplaywer", "kjubybot"]
+
+# Firewall Configuration
+firewall_trusted_sources:
+  - "10.42.0.0/16"
+  - "10.43.0.0/16"
+
+# Database Configuration
+postgres_port: 7432

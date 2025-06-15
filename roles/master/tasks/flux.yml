@@ -1,0 +1,46 @@
+---
+- name: Install curl and other dependencies
+  dnf:
+    name:
+      - curl
+      - git
+    state: present
+
+- name: Check if Flux is already installed
+  stat:
+    path: /usr/local/bin/flux
+  register: flux_binary
+
+- name: Install Flux CLI
+  shell: |
+    curl -s https://fluxcd.io/install.sh | sudo bash
+  when: not flux_binary.stat.exists
+
+- name: Verify Flux installation
+  command: flux version --client
+  register: flux_version
+  changed_when: false
+
+- name: Wait for K3s API to be available
+  wait_for:
+    host: localhost
+    port: 6443
+    timeout: 300
+
+- name: Install Flux on the cluster
+  shell: |
+    export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+    flux install
+  register: flux_install
+  retries: 3
+  delay: 10
+  until: flux_install.rc == 0
+
+- name: Verify Flux installation on cluster
+  shell: |
+    export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+    flux check
+  register: flux_check
+  retries: 5
+  delay: 30
+  until: flux_check.rc == 0
